@@ -213,7 +213,6 @@ class AdminController extends BaseAdminController
 
 	public function actionAddDrug()
 	{
-		return; //disabled OE-4474
 		$drug=new Drug('create');
 
 		if (!empty($_POST)) {
@@ -252,7 +251,6 @@ class AdminController extends BaseAdminController
 
 	public function actionEditDrug($id)
 	{
-		return; //disabled OE-4474
 		if (!$drug = Drug::model()->findByPk($id)) {
 			throw new Exception("Drug not found: $id");
 		}
@@ -311,6 +309,120 @@ class AdminController extends BaseAdminController
 				'errors' => @$errors,
 			));
 	}
+
+	public function actionDrugSets()
+	{
+
+		$subspecialty_id = null;
+		$drug_set_id = null;
+		$drug_sets = array();
+		$drug_set = array();
+
+
+		if($_POST){
+			if(!empty($_POST['subspecialty_id'])){
+				$subspecialty_id = $_POST['subspecialty_id'];
+				$params = array(':subspecialty_id' => $subspecialty_id);
+				$drug_sets = DrugSet::model()->findAll(array(
+					'condition' => 'subspecialty_id = :subspecialty_id',
+					'order' => 'name',
+					'params' => $params,
+				));
+			}
+			if(!empty($_POST['drug_set_id'])){
+				$drug_set_id = $_POST['drug_set_id'];
+				$drug_set = DrugSetItem::model()->findAllByAttributes(array('drug_set_id' => $drug_set_id));
+			}
+			if(!empty($_POST['drug_set_item'])){
+			  $this->updateDrugSet($drug_set, $_POST['drug_set_item']);
+
+			}
+		}
+
+		$this->render('/admin/drugsets',array(
+			'errors' => null,
+			'subspecialty_id' => $subspecialty_id ,
+			'drug_set_id'=>$drug_set_id,
+			'drug_set'=>$drug_set,
+			'drug_sets'=>$drug_sets,
+		));
+	}
+
+	public function updateDrugSet($drug_set_items, $new_drug_set_items)
+	{
+		$existing_item_ids = array();
+		$existing_taper_ids = array();
+
+		foreach ($drug_set_items as $item) {
+			$existing_item_ids[$item->id] = $item->id;
+			foreach ($item->tapers as $taper) {
+				$existing_taper_ids[$taper->id] = $taper->id;
+			}
+		}
+
+		foreach ($new_drug_set_items as $item) {
+			if (isset($item['id']) && isset($existing_item_ids[$item['id']])) {
+				$item_model = DrugSetItem::model()->findByPk($item['id']);
+				unset($existing_item_ids[$item['id']]);
+			} else {
+				// Item is new
+				$item_model = new DrugSetItem();
+				$item_model->drug_id = $item['drug_id'];
+			}
+
+			$item_model->dose = $item['dose'];
+			$item_model->frequency_id = $item['frequency_id'];
+			$item_model->duration_id = $item['duration_id'];
+			$item_model->save();
+
+			$new_tapers = (isset($item['taper'])) ? $item['taper'] : array();
+			foreach ($new_tapers as $taper) {
+				if (isset($taper['id']) && isset($existing_taper_ids[$taper['id']])) {
+					$taper_model = DrugSetItemTaper::model()->findByPk($taper['id']);
+					unset($existing_taper_ids[$taper['id']]);
+				} else {
+					$taper_model = new DrugSetItemTaper();
+					$taper_model->item_id = $item_model->id;
+				}
+				$taper_model->dose = $taper['dose'];
+				$taper_model->frequency_id = $taper['frequency_id'];
+				$taper_model->duration_id = $taper['duration_id'];
+				$taper_model->save();
+			}
+		}
+		DrugSetItemTaper::model()->deleteByPk(array_values($existing_taper_ids));
+		DrugSetItem::model()->deleteByPk(array_values($existing_item_ids));
+	}
+
+	protected function renderDrugSetItem($key, $source)
+	{
+		$item = new DrugSetItem();
+
+		$item->drug_id = $source->drug_id;
+		foreach (array('id','duration_id','frequency_id','dose') as $field) {
+			if ($source->$field) {
+				$item->$field = $source->$field;
+			}
+		}
+		if ($source->tapers) {
+			$tapers = array();
+			foreach ($source->tapers as $taper) {
+				$taper_model = new DrugItemTaper();
+				foreach (array('id, duration_id','frequency_id','dose') as $field) {
+					if ($taper->$field) {
+						$taper_model->$field = $taper->$field;
+					} else {
+						$taper_model->$field = $item->$field;
+					}
+				}
+				$tapers[] = $taper_model;
+			}
+			$item->tapers = $tapers;
+		}
+
+		$this->renderPartial('drug_set_item', array('key' => $key, 'item' => $item));
+	}
+
 
 	public function actionUserFind()
 	{

@@ -23,6 +23,8 @@
 			'Contacts' => '/admin/contacts',
 			'Contact labels' => '/admin/contactlabels',
 			'Data sources' => '/admin/datasources',
+			'Drugs' => '/admin/drugs',
+			'Drug Sets' => '/admin/drugsets',
 			'Institutions' => '/admin/institutions',
 			'Sites' => '/admin/sites',
 			'Commissioning bodies' => '/admin/commissioning_bodies',
